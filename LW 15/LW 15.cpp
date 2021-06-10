@@ -434,7 +434,7 @@ public:
         func.resize(int(NUMBER_OPERATORS));
         check_count.resize(int(NUMBER_OPERATORS));
     }
-    void add_operator(Operator A, std::function<double>(std::vector<double>) new_func, std::function<bool>(std::vector<double>) new_check_count)
+    void add_operator(Operator A, std::function<double>(std::vector<double>) func, std::function<bool>(std::vector<double>) new_check_count)
     {
         int n = A.get_id();
         base[n] = A;
