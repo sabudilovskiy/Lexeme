@@ -32,12 +32,19 @@ bool check_logarifm(std::vector <double> args);
 bool check_factorial(std::vector <double> args);
 bool check_pow(std::vector <double> args);
 bool check_div(std::vector <double> args);
+
+class Lexeme;
+class Sentence;
+class Operator;
+class Sentence;
+class Archieve;
 std::vector <double> sum(std::vector <double> a, std::vector <double> b)
 {
 	std::vector <double> c = a;
 	for (int i = 0; i < b.size(); i++)c.push_back(b[i]);
 	return c;
 }
+
 double my_abs(std::vector <double> args)
 {
 	return abs(args[0]);
@@ -113,6 +120,7 @@ double my_minus(std::vector <double> args)
 {
 	return args[0] - args[1];
 }
+
 bool always_true(std::vector <double> args)
 {
 	return 1;
@@ -172,6 +180,7 @@ bool is_numeral(char a)
 	if ('0' <= a and a <= '9') return true;
 	else return false;
 }
+
 enum id_lexemes
 {
 	//пре-унарные операторы, высший приоритет
@@ -197,6 +206,7 @@ enum id_errors
 	REDUNDANT_SIGNS, IMPOSSIBLE_COUNT, BAD_ARGUMENTS, MORE_RIGHT_BRACKETS, HAVE_OPEN_BRACKETS,
 	MISS_ARGUMENT_BINARY_OPERATOR, MISS_ARGUMENT_POST_OPERATOR, MISS_ARGUMENT_PRE_OPERATOR, UNKNOWN_ERROR
 };
+
 class Lexeme
 {
 private:
@@ -849,4 +859,3 @@ int main()
 	std::getline(std::cin, input);
 	check.substitute(stof(input));
 }
-
