@@ -435,12 +435,12 @@ public:
         func.resize(int(NUMBER_OPERATORS));
         check_count.resize(int(NUMBER_OPERATORS));
     }
-    void add_operator(Operator A, double(*)(std::vector <double>) cur_func, bool(*)(std::vector <double>) cur_check_count)
+    void add_operator(Operator A, double(*func)(std::vector <double>) , bool(*check_count)(std::vector <double>))
     {
         int n = A.get_id();
         base[n] = A;
-        func[n] = cur_func;
-        check_count[n] = cur_check_count;
+        this->func[n] = func;
+        this->check_count[n] = check_count;
     }
     std::vector <int> decode(std::string input, std::vector <int> verif = std::vector <int>(0))
     {
