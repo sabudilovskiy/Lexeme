@@ -32,6 +32,12 @@ bool check_logarifm(std::vector <double> args);
 bool check_factorial(std::vector <double> args);
 bool check_pow(std::vector <double> args);
 bool check_div(std::vector <double> args);
+std::vector <double> sum(std::vector <double> a, std::vector <double> b)
+{
+	std::vector <double> c = a;
+	for (int i = 0; i < b.size(); i++)c.push_back(b[i]);
+	return c;
+}
 double my_abs(std::vector <double> args)
 {
 	return abs(args[0]);
@@ -183,36 +189,50 @@ enum id_lexemes
 	//требуется для определения числа операторов
 	NUMBER_OPERATORS,
 	//технические вещи
-	NUMBER, X, LEFT_BR, RIGHT_BR, COMMA, END
+	ARGUMENT, X, LEFT_BR, RIGHT_BR, COMMA, END
 };
 enum id_errors
 {
-	NON_ERROR, UNKNOWN_SYMBOL, UNKNOWN_FUNCTION, ERROR_SIGNS, REDUNDANT_SIGNS, IMPOSSIBLE_COUNT, MORE_RIGHT_BRACKETS, HAVE_OPEN_BRACKETS
+	NON_ERROR, UNKNOWN_SYMBOL, UNKNOWN_FUNCTION, ERROR_SIGNS,
+	REDUNDANT_SIGNS, IMPOSSIBLE_COUNT, BAD_ARGUMENTS, MORE_RIGHT_BRACKETS, HAVE_OPEN_BRACKETS,
+	MISS_ARGUMENT_BINARY_OPERATOR, MISS_ARGUMENT_POST_OPERATOR, MISS_ARGUMENT_PRE_OPERATOR, UNKNOWN_ERROR
 };
 class Lexeme
 {
 private:
 	id_lexemes id;
-	double value;
+	std::vector<double> values;
 public:
+	Lexeme()
+	{
+		values.resize(1);
+	}
 	Lexeme(id_lexemes id, double value = 0)
 	{
 		this->id = id;
-		this->value = value;
+		this->values[0] = value;
+	}
+	Lexeme(id_lexemes id, std::vector <double> values)
+	{
+		this->id = id;
+		this->values = values;
 	}
 	id_lexemes get_id()
 	{
 		return id;
 	}
-	double get_value()
+	double get_value(int i = 0)
 	{
-		return value;
+		return values[i];
+	}
+	std::vector<double> get_values()
+	{
+		return values;
 	}
 };
 class Sentence
 {
 private:
-	int pos = 0;
 	std::vector <Lexeme> array;
 public:
 	Sentence()
@@ -221,6 +241,14 @@ public:
 	Sentence(std::vector <Lexeme> array)
 	{
 		for (int i = 0; i < array.size(); i++) add_lexeme(array[i]);
+	}
+	int find_left_br()
+	{
+		for (int i = 0; array[i].get_id() != END; i++)
+		{
+			if (array[i].get_id() == LEFT_BR) return i;
+		}
+		return -1;
 	}
 	//получить номер лексемы-конца
 	int get_end()
@@ -235,7 +263,6 @@ public:
 	//удалить лексему с таким номером
 	void delete_lexeme(int i)
 	{
-		if (pos >= i and pos != 0) pos--; //сейвим местоположение
 		array.erase(array.begin() + i);
 	}
 	//заменить лексему x на значение
@@ -245,7 +272,7 @@ public:
 		{
 			if (array[i].get_id() == X)
 			{
-				array[i] = Lexeme(NUMBER, x);
+				array[i] = Lexeme(ARGUMENT, x);
 			}
 		}
 	}
@@ -268,24 +295,14 @@ public:
 		}
 		array[a] = paste;
 	}
-	int find_highest_comma(id_errors& error)
+	std::vector <int> find_commas()
 	{
-		int answer = 0;
-		bool found_comma = 0;
+		std::vector <int> answer;
 		for (int i = 0; array[i].get_id() != END; i++)
 		{
 			if (array[i].get_id() == COMMA)
 			{
-				if (found_comma == 0)
-				{
-					answer = i;
-					found_comma = 1;
-				}
-				else
-				{
-					error = ERROR_SIGNS;
-					return answer;
-				}
+				answer.push_back(i);
 			}
 			else if (array[i].get_id() == LEFT_BR)
 			{
@@ -293,30 +310,6 @@ public:
 			}
 		}
 
-	}
-	//проверить вектор на ошибки(избыточное использование знаков)
-	bool is_correct()
-	{
-		for (int i = 0; array[i].get_id() != END; i++)
-		{
-			if (POW <= array[i].get_id() and array[i].get_id() <= MINUS and POW <= array[i + 1].get_id() and array[i + 1].get_id() <= MINUS)
-			{
-				return 0;
-			}
-		}
-		return 1;
-	}
-	//найти лексему с определённым id
-	int find_id_lexeme(id_lexemes id)
-	{
-		for (int i = 0; i < array.size(); i++)
-		{
-			if (array[i].get_id() == LEFT_BR)
-			{
-				return i;
-			}
-		}
-		return -1;
 	}
 	//найти закрывающую скобку для открывающей
 	int find_right_bracket(unsigned int a)
@@ -332,7 +325,219 @@ public:
 			}
 		}
 	}
+	//найти оператор с наивысшим приоритетом
+	int find_highest_priority(Archieve* archieve)
+	{
+		int max_priority = -INFINITY;
+		for (int i = 0; array[i].get_id() != END; i++)
+		{
+			if (array[i].get_id() != ARGUMENT)
+			{
+				int cur_priority = archieve->get_priority(array[i].get_id());
+				if (cur_priority > max_priority)
+				{
+					max_priority = cur_priority;
+				}
+			}
+		}
+		return max_priority;
+	}
+	int find_countable_operator(int priority, Archieve* archieve)
+	{
+		for (int i = 0; array[i].get_id() != END; i++)
+		{
+			int left = archieve->get_left_argue(array[i].get_id());
+			int right = archieve->get_right_argue(array[i].get_id());
+			if ((left == 0 or array[i - 1].get_id() == ARGUMENT) and (right == 0 or array[i + 1].get_id() == ARGUMENT)) return i;
+		}
+		return -1;
+	}
+	bool find_errors(id_errors& error, Archieve* archieve)
+	{
+		int n = array.size() - 1;
+		if (archieve->get_left_argue(array[0].get_id()) == 0 and archieve->get_right_argue(array[n].get_id()) == 0)
+		{
+			for (int i = 1; i < n; i++)
+			{
+				id_lexemes cur_id;
+				int left = archieve->get_left_argue(cur_id);
+				int right = archieve->get_right_argue(cur_id);
+				if (left > 0 and right > 0)
+				{
+					if (archieve->get_right_argue(array[i - 1].get_id()) == 0 and archieve->get_left_argue(array[i + 1].get_id()) == 0)
+					{
+
+					}
+					else
+					{
+						error = MISS_ARGUMENT_BINARY_OPERATOR;
+						return true;
+					}
+				}
+				else if (left > 0)
+				{
+					if (archieve->get_right_argue(array[i - 1].get_id()) == 0 and archieve->get_left_argue(array[i + 1].get_id()) != 0)
+					{
+
+					}
+					else
+					{
+						error = MISS_ARGUMENT_POST_OPERATOR;
+						return true;
+					}
+				}
+				else
+				{
+					if (archieve->get_left_argue(array[i + 1].get_id()) == 0 and archieve->get_right_argue(array[i - 1].get_id()) != 0)
+					{
+
+					}
+					else
+					{
+						error = MISS_ARGUMENT_PRE_OPERATOR;
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
 	//посчитать значение предложения
+	Lexeme count(id_errors& error, Archieve* archieve)
+	{
+		int a = find_left_br();
+		while (a != -1) //избавляемся от скобок
+		{
+			int b = find_right_bracket(a);
+			Sentence current = this->create_lexeme_vector(a + 1, b - 1);
+			std::vector <int> commas = current.find_commas();
+			//в скобках выражение без запятых
+			if (commas.size() == 0)
+			{
+				Lexeme replace = current.count(error, archieve);
+				if (error == NON_ERROR)
+				{
+					this->replace_sector(a, b, replace);
+				}
+				else
+				{
+					return Lexeme(END);
+				}
+			}
+			//есть запятые
+			else
+			{
+				std::vector <Sentence> A(commas.size() + 2);
+				std::vector <double> values(commas.size() + 2);
+				A[0] = this->create_lexeme_vector(a + 1, commas[0]);
+				for (int i = 1; i < commas.size(); i++)
+				{
+					A[1] = this->create_lexeme_vector(commas[i - 1] + 1, commas[i] - 1);
+				}
+				A[A.size() - 1] = this->create_lexeme_vector(commas[commas.size() - 1] + 1, b - 1);
+				for (int i = 0; i < values.size(); i++)
+				{
+					values[i] = A[i].count(error, archieve).get_value();
+					if (error != NON_ERROR)
+					{
+						return Lexeme(END);
+					}
+				}
+				Lexeme replace = Lexeme(ARGUMENT, values);
+				this->replace_sector(a, b, replace);
+			}
+		}
+		a = find_highest_priority(archieve);
+		while (a != -INFINITY)
+		{
+			int b = find_countable_operator(a, archieve);
+			while (b != -1)
+			{
+				int left = archieve->get_left_argue(array[b].get_id());
+				int right = archieve->get_right_argue(array[b].get_id());
+				if (left > 0 and right > 0)
+				{
+					std::vector <double> left_argue = array[b - 1].get_values();
+					std::vector <double> right_argue = array[b + 1].get_values();
+					if (left == left_argue.size() and right == right_argue.size())
+					{
+						std::vector <double> argue = sum(left_argue, right_argue);
+						if (archieve->check_countable(array[b].get_id(), argue))
+						{
+							Lexeme replace = Lexeme(ARGUMENT, archieve->count(array[b].get_id(), argue));
+							this->replace_sector(b - 1, b + 1, replace);
+						}
+						else
+						{
+							error = IMPOSSIBLE_COUNT;
+							return Lexeme(END);
+						}
+					}
+					else
+					{
+						error = BAD_ARGUMENTS;
+						return Lexeme(END);
+					}
+				}
+				else if (left > 0)
+				{
+					std::vector <double> left_argue = array[b - 1].get_values();
+					if (left == left_argue.size())
+					{
+						std::vector <double> argue = left_argue;
+						if (archieve->check_countable(array[b].get_id(), argue))
+						{
+							Lexeme replace = Lexeme(ARGUMENT, archieve->count(array[b].get_id(), argue));
+							this->replace_sector(b - 1, b + 1, replace);
+						}
+						else
+						{
+							error = IMPOSSIBLE_COUNT;
+							return Lexeme(END);
+						}
+					}
+					else
+					{
+						error = BAD_ARGUMENTS;
+						return Lexeme(END);
+					}
+				}
+				else
+				{
+					std::vector <double> right_argue = array[b + 1].get_values();
+					if (right == right_argue.size())
+					{
+						std::vector <double> argue = right_argue;
+						if (archieve->check_countable(array[b].get_id(), argue))
+						{
+							Lexeme replace = Lexeme(ARGUMENT, archieve->count(array[b].get_id(), argue));
+							this->replace_sector(b - 1, b + 1, replace);
+						}
+						else
+						{
+							error = IMPOSSIBLE_COUNT;
+							return Lexeme(END);
+						}
+					}
+					else
+					{
+						error = BAD_ARGUMENTS;
+						return Lexeme(END);
+					}
+				}
+				b = find_countable_operator(a, archieve);
+			}
+			a = find_highest_priority(archieve);
+		}
+		if (array.size() == 2)
+		{
+			return array[0];
+		}
+		else
+		{
+			error = UNKNOWN_ERROR;
+		}
+	}
 };
 class Operator
 {
@@ -402,7 +607,6 @@ class Archieve
 {
 private:
 	std::vector <Operator> base;
-
 	std::vector <double(*)(std::vector <double>)> func;
 	std::vector <bool(*)(std::vector <double>)> check_count;
 public:
@@ -455,6 +659,34 @@ public:
 		}
 		return answer;
 
+	}
+	int get_priority(id_lexemes id)
+	{
+		return base[id].get_priority();
+	}
+	int get_left_argue(id_lexemes id)
+	{
+		if (id != X)
+		{
+			return base[id].get_left_argue();
+		}
+		else return 0;
+	}
+	int get_right_argue(id_lexemes id)
+	{
+		if (id != X)
+		{
+			return base[id].get_right_argue();
+		}
+		else return 0;
+	}
+	bool check_countable(id_lexemes id, std::vector <double> argues)
+	{
+		return check_count[id](argues);
+	}
+	double count(id_lexemes id, std::vector <double> argues)
+	{
+		return func[id](argues);
 	}
 };
 Sentence convert_to_lexemes(std::string input, id_errors& error, Archieve* archieve)
@@ -515,7 +747,7 @@ Sentence convert_to_lexemes(std::string input, id_errors& error, Archieve* archi
 					buffer.push_back(input[pos++]);
 				}
 			}
-			answer.add_lexeme(Lexeme(NUMBER, stof(buffer)));
+			answer.add_lexeme(Lexeme(ARGUMENT, stof(buffer)));
 		}
 		else
 		{
@@ -614,6 +846,7 @@ int main()
 	std::cout << "a";
 	Sentence check = convert_to_lexemes(input, error, &archieve);
 	std::cout << "a";
-
+	std::getline(std::cin, input);
+	check.substitute(stof(input));
 }
 
