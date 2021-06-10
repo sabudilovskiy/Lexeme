@@ -425,8 +425,9 @@ class Archieve
 {
 private:
     std::vector <Operator> base;
-    std::vector <std::function<double>(std::vector<double>)> func;
-    std::vector <std::function<bool>(std::vector<double>)> check_count;
+    
+    std::vector <double(*)(std::vector <double>)> func;
+    std::vector <bool(*)(std::vector <double>)> check_count;
 public:
     Archieve()
     {
@@ -434,12 +435,12 @@ public:
         func.resize(int(NUMBER_OPERATORS));
         check_count.resize(int(NUMBER_OPERATORS));
     }
-    void add_operator(Operator A, std::function<double>(std::vector<double>) func, std::function<bool>(std::vector<double>) new_check_count)
+    void add_operator(Operator A, double(*)(std::vector <double>) cur_func, bool(*)(std::vector <double>) cur_check_count)
     {
         int n = A.get_id();
         base[n] = A;
-        this->func[n] = func;
-        this->check_count[n] = check_count;
+        func[n] = cur_func;
+        check_count[n] = cur_check_count;
     }
     std::vector <int> decode(std::string input, std::vector <int> verif = std::vector <int>(0))
     {
