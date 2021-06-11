@@ -308,7 +308,7 @@ public:
 				i = find_right_bracket(i) + 1;
 			}
 		}
-
+		return answer;
 	}
 	//найти закрывающую скобку для открывающей
 	int find_right_bracket(unsigned int a)
@@ -697,4 +697,5 @@ int main()
 	std::cout << "a";
 	std::getline(std::cin, input);
 	check.substitute(stof(input));
+	check.count(error, &archieve);
 }
