@@ -296,14 +296,14 @@ public:
 		}
 		array[a] = paste;
 	}
-	std::vector <int> find_commas()
+	std::vector <int> find_commas(int begin = 0)
 	{
 		std::vector <int> answer;
 		for (int i = 0; array[i].get_id() != END; i++)
 		{
 			if (array[i].get_id() == COMMA)
 			{
-				answer.push_back(i);
+				answer.push_back(i + begin + 1);
 			}
 			else if (array[i].get_id() == LEFT_BR)
 			{
@@ -414,7 +414,7 @@ public:
 		{
 			int b = find_right_bracket(a);
 			Sentence current = this->create_lexeme_vector(a + 1, b - 1);
-			std::vector <int> commas = current.find_commas();
+			std::vector <int> commas = current.find_commas(a);
 			//в скобках выражение без запятых
 			if (commas.size() == 0)
 			{
@@ -431,9 +431,9 @@ public:
 			//есть запятые
 			else
 			{
-				std::vector <Sentence> A(commas.size() + 2);
-				std::vector <double> values(commas.size() + 2);
-				A[0] = this->create_lexeme_vector(a + 1, commas[0]);
+				std::vector <Sentence> A(commas.size() + 1);
+				std::vector <double> values(commas.size() + 1);
+				A[0] = this->create_lexeme_vector(a + 1, commas[0] - 1);
 				for (int i = 1; i < commas.size(); i++)
 				{
 					A[1] = this->create_lexeme_vector(commas[i - 1] + 1, commas[i] - 1);
