@@ -42,8 +42,7 @@ enum id_lexemes
 };
 enum id_errors
 {
-	NON_ERROR, UNKNOWN_SYMBOL, UNKNOWN_FUNCTION, ERROR_SIGNS,
-	REDUNDANT_SIGNS, IMPOSSIBLE_COUNT, BAD_ARGUMENTS, MORE_RIGHT_BRACKETS, HAVE_OPEN_BRACKETS,
+	NON_ERROR, ERROR_SIGNS, UNKNOWN_FUNCTION, IMPOSSIBLE_COUNT, BAD_ARGUMENTS, MORE_RIGHT_BRACKETS, HAVE_OPEN_BRACKETS,
 	MISS_ARGUMENT_BINARY_OPERATOR, MISS_ARGUMENT_POST_OPERATOR, MISS_ARGUMENT_PRE_OPERATOR, UNKNOWN_ERROR
 };
 class Lexeme
@@ -363,7 +362,7 @@ public:
 		{
 			for (int i = 1; i < n; i++)
 			{
-				id_lexemes cur_id;
+				id_lexemes cur_id = array[i].get_id();
 				int left = archieve->get_left_argue(cur_id);
 				int right = archieve->get_right_argue(cur_id);
 				if (left > 0 and right > 0)
@@ -410,6 +409,10 @@ public:
 	Lexeme count(id_errors& error, Archieve* archieve)
 	{
 		int a = find_left_br();
+		if (find_errors(error, archieve) == 1)
+		{
+			return Lexeme(END);
+		}
 		while (a != -1) //избавляемся от скобок
 		{
 			int b = find_right_bracket(a);
@@ -451,7 +454,7 @@ public:
 				this->replace_sector(a, b, replace);
 			}
 			a = find_left_br();
-		}
+		}	
 		a = find_highest_priority(archieve);
 		while (a != 0)
 		{
@@ -620,6 +623,8 @@ Sentence convert_to_lexemes(std::string input, id_errors& error, Archieve* archi
 }
 int main()
 {
+	SetConsoleCP(1251);
+	SetConsoleOutputCP(1251);
 	double x;
 	Lexeme answer;
 	Archieve archieve;
@@ -673,5 +678,48 @@ int main()
 	x = stof(input);
 	check.substitute(x);
 	answer = check.count(error, &archieve);
-	std::cout << answer.get_value();
+	if (error == NON_ERROR)
+	{
+		std::cout << answer.get_value();
+	}
+	else if (error == UNKNOWN_FUNCTION)
+	{
+		std::cout << "Неизвестная функция.";
+	}
+	else if (error == ERROR_SIGNS)
+	{
+		std::cout << "Какое-то из чисел записано с ошибкой: слишком много точек.";
+	}
+	else if (error == IMPOSSIBLE_COUNT)
+	{
+		std::cout << "Функцию в заданной точке невозможно вычислить.";
+	}
+	else if (error == MISS_ARGUMENT_BINARY_OPERATOR)
+	{
+		std::cout << "У какого-то из бинарных операторов отсутствует аргумент.";
+	}
+	else if (error == MISS_ARGUMENT_PRE_OPERATOR)
+	{
+		std::cout << "У какого-то из преоператоров отсутствует аргумент.";
+	}
+	else if (error == MISS_ARGUMENT_POST_OPERATOR)
+	{
+		std::cout << "У какого-то из постоператоров отсутствует аргумент. ";
+	}
+	else if (error == HAVE_OPEN_BRACKETS)
+	{
+		std::cout << "Не все скобки закрыты.";
+	}
+	else if (error == MORE_RIGHT_BRACKETS)
+	{
+		std::cout << "Закрыто больше скобок, чем открыто.";
+	}
+	else if (error == BAD_ARGUMENTS)
+	{
+		std::cout << "У какого-то из операторов не соответствует число аргументов.";
+	}
+	else
+	{
+		std::cout << "Неизвестная ошибка.";
+	}
 }
