@@ -58,6 +58,7 @@ public:
 	}
 	Lexeme(id_lexemes id, double value = 0)
 	{
+		values.resize(1);
 		this->id = id;
 		this->values[0] = value;
 	}
@@ -140,7 +141,7 @@ public:
 	}
 	Operator()
 	{
-		priority = -INFINITY;
+		priority = 0;
 	}
 };
 class Archieve
@@ -206,7 +207,7 @@ public:
 	}
 	int get_left_argue(id_lexemes id)
 	{
-		if (id != X)
+		if (id != X and id != ARGUMENT)
 		{
 			return base[id].get_left_argue();
 		}
@@ -214,7 +215,7 @@ public:
 	}
 	int get_right_argue(id_lexemes id)
 	{
-		if (id != X)
+		if (id != X and id != ARGUMENT)
 		{
 			return base[id].get_right_argue();
 		}
@@ -283,6 +284,7 @@ public:
 		{
 			buffer.push_back(array[i]);
 		}
+		buffer.push_back(Lexeme(END));
 		return Sentence(buffer);
 	}
 	//заменить диапазон на одну лексему
@@ -305,7 +307,7 @@ public:
 			}
 			else if (array[i].get_id() == LEFT_BR)
 			{
-				i = find_right_bracket(i) + 1;
+				i = find_right_bracket(i);
 			}
 		}
 		return answer;
@@ -327,7 +329,7 @@ public:
 	//найти оператор с наивысшим приоритетом
 	int find_highest_priority(Archieve* archieve)
 	{
-		int max_priority = -INFINITY;
+		int max_priority = 0;
 		for (int i = 0; array[i].get_id() != END; i++)
 		{
 			if (array[i].get_id() != ARGUMENT)
@@ -345,9 +347,12 @@ public:
 	{
 		for (int i = 0; array[i].get_id() != END; i++)
 		{
-			int left = archieve->get_left_argue(array[i].get_id());
-			int right = archieve->get_right_argue(array[i].get_id());
-			if ((left == 0 or array[i - 1].get_id() == ARGUMENT) and (right == 0 or array[i + 1].get_id() == ARGUMENT)) return i;
+			if (array[i].get_id() != ARGUMENT and archieve->get_priority(array[i].get_id())==priority)
+			{
+				int left = archieve->get_left_argue(array[i].get_id());
+				int right = archieve->get_right_argue(array[i].get_id());
+				if ((left == 0 or array[i - 1].get_id() == ARGUMENT) and (right == 0 or array[i + 1].get_id() == ARGUMENT)) return i;
+			}	
 		}
 		return -1;
 	}
@@ -445,84 +450,47 @@ public:
 				Lexeme replace = Lexeme(ARGUMENT, values);
 				this->replace_sector(a, b, replace);
 			}
+			a = find_left_br();
 		}
 		a = find_highest_priority(archieve);
-		while (a != -INFINITY)
+		while (a != 0)
 		{
 			int b = find_countable_operator(a, archieve);
 			while (b != -1)
 			{
 				int left = archieve->get_left_argue(array[b].get_id());
 				int right = archieve->get_right_argue(array[b].get_id());
-				if (left > 0 and right > 0)
+				bool l = left != 0 ? 1 : 0;
+				bool r = right != 0 ? 1 : 0;
+				std::vector <double> left_argue, right_argue;
+				if (l)
 				{
-					std::vector <double> left_argue = array[b - 1].get_values();
-					std::vector <double> right_argue = array[b + 1].get_values();
-					if (left == left_argue.size() and right == right_argue.size())
+					left_argue = array[b - 1].get_values();
+					if (left != left_argue.size())
 					{
-						std::vector <double> argue = sum(left_argue, right_argue);
-						if (archieve->check_countable(array[b].get_id(), argue))
-						{
-							Lexeme replace = Lexeme(ARGUMENT, archieve->count(array[b].get_id(), argue));
-							this->replace_sector(b - 1, b + 1, replace);
-						}
-						else
-						{
-							error = IMPOSSIBLE_COUNT;
-							return Lexeme(END);
-						}
+						error = BAD_ARGUMENTS;
+						return Lexeme(END);
 					}
-					else
+				}	
+				if (r)
+				{
+					right_argue = array[b + 1].get_values();
+					if (right != right_argue.size())
 					{
 						error = BAD_ARGUMENTS;
 						return Lexeme(END);
 					}
 				}
-				else if (left > 0)
+				std::vector <double> argue = sum(left_argue, right_argue);
+				if (archieve->check_countable(array[b].get_id(), argue))
 				{
-					std::vector <double> left_argue = array[b - 1].get_values();
-					if (left == left_argue.size())
-					{
-						std::vector <double> argue = left_argue;
-						if (archieve->check_countable(array[b].get_id(), argue))
-						{
-							Lexeme replace = Lexeme(ARGUMENT, archieve->count(array[b].get_id(), argue));
-							this->replace_sector(b - 1, b + 1, replace);
-						}
-						else
-						{
-							error = IMPOSSIBLE_COUNT;
-							return Lexeme(END);
-						}
-					}
-					else
-					{
-						error = BAD_ARGUMENTS;
-						return Lexeme(END);
-					}
+					Lexeme replace = Lexeme(ARGUMENT, archieve->count(array[b].get_id(), argue));
+					this->replace_sector(b - 1 * l , b + 1 * r, replace);
 				}
 				else
 				{
-					std::vector <double> right_argue = array[b + 1].get_values();
-					if (right == right_argue.size())
-					{
-						std::vector <double> argue = right_argue;
-						if (archieve->check_countable(array[b].get_id(), argue))
-						{
-							Lexeme replace = Lexeme(ARGUMENT, archieve->count(array[b].get_id(), argue));
-							this->replace_sector(b - 1, b + 1, replace);
-						}
-						else
-						{
-							error = IMPOSSIBLE_COUNT;
-							return Lexeme(END);
-						}
-					}
-					else
-					{
-						error = BAD_ARGUMENTS;
-						return Lexeme(END);
-					}
+					error = IMPOSSIBLE_COUNT;
+					return Lexeme(END);
 				}
 				b = find_countable_operator(a, archieve);
 			}
@@ -535,6 +503,7 @@ public:
 		else
 		{
 			error = UNKNOWN_ERROR;
+			return Lexeme(END);
 		}
 	}
 };
@@ -546,6 +515,7 @@ Sentence convert_to_lexemes(std::string input, id_errors& error, Archieve* archi
 	int right_brs = 0;
 	while (pos < input.length())
 	{
+		while (pos < input.length() and input[pos] == ' ')pos++;
 		if (input[pos] == ',')
 		{
 			answer.add_lexeme(Lexeme(COMMA));
@@ -639,6 +609,7 @@ Sentence convert_to_lexemes(std::string input, id_errors& error, Archieve* archi
 	}
 	if (left_brs == right_brs)
 	{
+		answer.add_lexeme(Lexeme(END));
 		return answer;
 	}
 	else
@@ -649,8 +620,11 @@ Sentence convert_to_lexemes(std::string input, id_errors& error, Archieve* archi
 }
 int main()
 {
+	double x;
+	Lexeme answer;
 	Archieve archieve;
 	{
+		//из-за специфики работы приоритетов, 0 - должен быть закреплён за отсутствием каких-либо операторов. Он - конец вычислений.
 		Operator cur_op;
 		int prior_func = 5;
 		int prior_pow = 4;
@@ -678,6 +652,8 @@ int main()
 		archieve.add_operator(cur_op, my_exp, always_true);
 		cur_op = Operator(LOG, 0, 2, prior_func, 1, "log");
 		archieve.add_operator(cur_op, my_log, check_logarifm);
+		cur_op = Operator(LN, 0, 1, prior_func, 1, "ln");
+		archieve.add_operator(cur_op, my_ln, check_ln);
 		cur_op = Operator(POW, 1, 1, prior_pow, 1, "^");
 		archieve.add_operator(cur_op, my_pow, check_pow);
 		cur_op = Operator(MULT, 1, 1, prior_mult_div, 1, "*");
@@ -692,10 +668,10 @@ int main()
 	std::string input;
 	id_errors error = NON_ERROR;
 	std::getline(std::cin, input);
-	std::cout << "a";
 	Sentence check = convert_to_lexemes(input, error, &archieve);
-	std::cout << "a";
 	std::getline(std::cin, input);
-	check.substitute(stof(input));
-	check.count(error, &archieve);
+	x = stof(input);
+	check.substitute(x);
+	answer = check.count(error, &archieve);
+	std::cout << answer.get_value();
 }
