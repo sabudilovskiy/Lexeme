@@ -24,7 +24,7 @@ bool is_numeral(char a)
 enum id_lexemes
 {
 	//пре-унарные операторы, высший приоритет
-	ABS = 1, SIN, COS, TG, CTG, ARCSIN, ARCCOS, ARCTG, ARCCTG, EXP, LN,
+	ABS = 0, SIN, COS, TG, CTG, ARCSIN, ARCCOS, ARCTG, ARCCTG, EXP, LN,
 	//псевдо пре-унарный оператор
 	LOG,
 	//пост-унарные операторы, приоритет: 2
@@ -83,8 +83,8 @@ class Operator
 {
 private:
 	id_lexemes id;
-	unsigned int left_argue;
-	unsigned int right_argue;
+	unsigned int left_argue = 0;
+	unsigned int right_argue = 0;
 	int priority;
 	std::vector <std::string> decode_base;
 public:
@@ -147,21 +147,18 @@ class Archieve
 {
 private:
 	std::vector <Operator> base;
-	std::vector <double(*)(std::vector <double>)> func;
-	std::vector <bool(*)(std::vector <double>)> check_count;
+	std::vector <Function*> functions;
 public:
 	Archieve()
 	{
 		base.resize(int(NUMBER_OPERATORS));
-		func.resize(int(NUMBER_OPERATORS));
-		check_count.resize(int(NUMBER_OPERATORS));
+		functions.resize(int(NUMBER_OPERATORS));
 	}
-	void add_operator(Operator A, double(*func)(std::vector <double>), bool(*check_count)(std::vector <double>))
+	void add_operator(Operator A, Function* function)
 	{
 		int n = A.get_id();
 		base[n] = A;
-		this->func[n] = func;
-		this->check_count[n] = check_count;
+		this->functions[n] = function;
 	}
 	std::vector <int> decode(std::string input, std::vector <int> verif = std::vector <int>(0))
 	{
@@ -198,7 +195,6 @@ public:
 			}
 		}
 		return answer;
-
 	}
 	int get_priority(id_lexemes id)
 	{
@@ -206,33 +202,27 @@ public:
 	}
 	int get_left_argue(id_lexemes id)
 	{
-		if (id != X and id != ARGUMENT)
-		{
-			return base[id].get_left_argue();
-		}
+		if (id <= base.size()) return base[id].get_left_argue();
 		else return 0;
 	}
 	int get_right_argue(id_lexemes id)
 	{
-		if (id != X and id != ARGUMENT)
-		{
-			return base[id].get_right_argue();
-		}
+		if (id <= base.size()) return base[id].get_right_argue();
 		else return 0;
 	}
 	bool check_countable(id_lexemes id, std::vector <double> argues)
 	{
-		return check_count[id](argues);
+		return functions[id]->check(argues);
 	}
 	double count(id_lexemes id, std::vector <double> argues)
 	{
-		return func[id](argues);
+		return functions[id]->count(argues);
 	}
 };
 class Sentence
 {
 private:
-	std::vector <Lexeme> array;
+	std::vector <Lexeme> _array;
 public:
 	Sentence()
 	{
@@ -243,35 +233,35 @@ public:
 	}
 	int find_left_br()
 	{
-		for (int i = 0; array[i].get_id() != END; i++)
+		for (int i = 0; _array[i].get_id() != END; i++)
 		{
-			if (array[i].get_id() == LEFT_BR) return i;
+			if (_array[i].get_id() == LEFT_BR) return i;
 		}
 		return -1;
 	}
 	//получить номер лексемы-конца
 	int get_end()
 	{
-		return array.size() - 1;
+		return _array.size() - 1;
 	}
 	//добавить лексему
 	void add_lexeme(Lexeme a)
 	{
-		array.push_back(a);
+		_array.push_back(a);
 	}
 	//удалить лексему с таким номером
 	void delete_lexeme(int i)
 	{
-		array.erase(array.begin() + i);
+		_array.erase(_array.begin() + i);
 	}
 	//заменить лексему x на значение
 	void substitute(double x)
 	{
-		for (int i = 0; i < array.size(); i++)
+		for (int i = 0; i < _array.size(); i++)
 		{
-			if (array[i].get_id() == X)
+			if (_array[i].get_id() == X)
 			{
-				array[i] = Lexeme(ARGUMENT, x);
+				_array[i] = Lexeme(ARGUMENT, x);
 			}
 		}
 	}
@@ -281,7 +271,7 @@ public:
 		std::vector <Lexeme> buffer;
 		for (int i = a; i <= b; i++)
 		{
-			buffer.push_back(array[i]);
+			buffer.push_back(_array[i]);
 		}
 		buffer.push_back(Lexeme(END));
 		return Sentence(buffer);
@@ -293,18 +283,18 @@ public:
 		{
 			this->delete_lexeme(a);
 		}
-		array[a] = paste;
+		_array[a] = paste;
 	}
 	std::vector <int> find_commas(int begin = 0)
 	{
 		std::vector <int> answer;
-		for (int i = 0; array[i].get_id() != END; i++)
+		for (int i = 0; _array[i].get_id() != END; i++)
 		{
-			if (array[i].get_id() == COMMA)
+			if (_array[i].get_id() == COMMA)
 			{
 				answer.push_back(i + begin + 1);
 			}
-			else if (array[i].get_id() == LEFT_BR)
+			else if (_array[i].get_id() == LEFT_BR)
 			{
 				i = find_right_bracket(i);
 			}
@@ -317,8 +307,8 @@ public:
 		int count_open_brackets = 1;
 		for (int i = a + 1; ; i++)
 		{
-			if (array[i].get_id() == LEFT_BR) count_open_brackets++;
-			else if (array[i].get_id() == RIGHT_BR) count_open_brackets--;
+			if (_array[i].get_id() == LEFT_BR) count_open_brackets++;
+			else if (_array[i].get_id() == RIGHT_BR) count_open_brackets--;
 			if (count_open_brackets == 0)
 			{
 				return i;
@@ -329,11 +319,11 @@ public:
 	int find_highest_priority(Archieve* archieve)
 	{
 		int max_priority = 0;
-		for (int i = 0; array[i].get_id() != END; i++)
+		for (int i = 0; _array[i].get_id() != END; i++)
 		{
-			if (array[i].get_id() != ARGUMENT)
+			if (_array[i].get_id() != ARGUMENT)
 			{
-				int cur_priority = archieve->get_priority(array[i].get_id());
+				int cur_priority = archieve->get_priority(_array[i].get_id());
 				if (cur_priority > max_priority)
 				{
 					max_priority = cur_priority;
@@ -344,30 +334,30 @@ public:
 	}
 	int find_countable_operator(int priority, Archieve* archieve)
 	{
-		for (int i = 0; array[i].get_id() != END; i++)
+		for (int i = 0; _array[i].get_id() != END; i++)
 		{
-			if (array[i].get_id() != ARGUMENT and archieve->get_priority(array[i].get_id())==priority)
+			if (_array[i].get_id() != ARGUMENT and archieve->get_priority(_array[i].get_id())==priority)
 			{
-				int left = archieve->get_left_argue(array[i].get_id());
-				int right = archieve->get_right_argue(array[i].get_id());
-				if ((left == 0 or array[i - 1].get_id() == ARGUMENT) and (right == 0 or array[i + 1].get_id() == ARGUMENT)) return i;
+				int left = archieve->get_left_argue(_array[i].get_id());
+				int right = archieve->get_right_argue(_array[i].get_id());
+				if ((left == 0 or _array[i - 1].get_id() == ARGUMENT) and (right == 0 or _array[i + 1].get_id() == ARGUMENT)) return i;
 			}	
 		}
 		return -1;
 	}
 	bool find_errors(id_errors& error, Archieve* archieve)
 	{
-		int n = array.size() - 1;
-		if (archieve->get_left_argue(array[0].get_id()) == 0 and archieve->get_right_argue(array[n].get_id()) == 0)
+		int n = _array.size() - 1;
+		if (archieve->get_left_argue(_array[0].get_id()) == 0 and archieve->get_right_argue(_array[n].get_id()) == 0)
 		{
 			for (int i = 1; i < n; i++)
 			{
-				id_lexemes cur_id = array[i].get_id();
+				id_lexemes cur_id = _array[i].get_id();
 				int left = archieve->get_left_argue(cur_id);
 				int right = archieve->get_right_argue(cur_id);
 				if (left > 0 and right > 0)
 				{
-					if (archieve->get_right_argue(array[i - 1].get_id()) == 0 and archieve->get_left_argue(array[i + 1].get_id()) == 0)
+					if (archieve->get_right_argue(_array[i - 1].get_id()) == 0 and archieve->get_left_argue(_array[i + 1].get_id()) == 0)
 					{
 
 					}
@@ -379,7 +369,7 @@ public:
 				}
 				else if (left > 0)
 				{
-					if (archieve->get_right_argue(array[i - 1].get_id()) == 0 and archieve->get_left_argue(array[i + 1].get_id()) != 0)
+					if (archieve->get_right_argue(_array[i - 1].get_id()) == 0 and archieve->get_left_argue(_array[i + 1].get_id()) != 0)
 					{
 
 					}
@@ -389,9 +379,9 @@ public:
 						return true;
 					}
 				}
-				else
+				else if (right > 0)
 				{
-					if (archieve->get_left_argue(array[i + 1].get_id()) == 0 and archieve->get_right_argue(array[i - 1].get_id()) != 0)
+					if (archieve->get_left_argue(_array[i + 1].get_id()) == 0 and archieve->get_right_argue(_array[i - 1].get_id()) != 0)
 					{
 
 					}
@@ -409,10 +399,6 @@ public:
 	Lexeme count(id_errors& error, Archieve* archieve)
 	{
 		int a = find_left_br();
-		if (find_errors(error, archieve) == 1)
-		{
-			return Lexeme(END);
-		}
 		while (a != -1) //избавляемся от скобок
 		{
 			int b = find_right_bracket(a);
@@ -455,20 +441,24 @@ public:
 			}
 			a = find_left_br();
 		}	
+		if (find_errors(error, archieve) == 1)
+		{
+			return Lexeme(END);
+		}
 		a = find_highest_priority(archieve);
 		while (a != 0)
 		{
 			int b = find_countable_operator(a, archieve);
 			while (b != -1)
 			{
-				int left = archieve->get_left_argue(array[b].get_id());
-				int right = archieve->get_right_argue(array[b].get_id());
+				int left = archieve->get_left_argue(_array[b].get_id());
+				int right = archieve->get_right_argue(_array[b].get_id());
 				bool l = left != 0 ? 1 : 0;
 				bool r = right != 0 ? 1 : 0;
 				std::vector <double> left_argue, right_argue;
 				if (l)
 				{
-					left_argue = array[b - 1].get_values();
+					left_argue = _array[b - 1].get_values();
 					if (left != left_argue.size())
 					{
 						error = BAD_ARGUMENTS;
@@ -477,7 +467,7 @@ public:
 				}	
 				if (r)
 				{
-					right_argue = array[b + 1].get_values();
+					right_argue = _array[b + 1].get_values();
 					if (right != right_argue.size())
 					{
 						error = BAD_ARGUMENTS;
@@ -485,9 +475,9 @@ public:
 					}
 				}
 				std::vector <double> argue = sum(left_argue, right_argue);
-				if (archieve->check_countable(array[b].get_id(), argue))
+				if (archieve->check_countable(_array[b].get_id(), argue))
 				{
-					Lexeme replace = Lexeme(ARGUMENT, archieve->count(array[b].get_id(), argue));
+					Lexeme replace = Lexeme(ARGUMENT, archieve->count(_array[b].get_id(), argue));
 					this->replace_sector(b - 1 * l , b + 1 * r, replace);
 				}
 				else
@@ -499,9 +489,9 @@ public:
 			}
 			a = find_highest_priority(archieve);
 		}
-		if (array.size() == 2)
+		if (_array.size() == 2)
 		{
-			return array[0];
+			return _array[0];
 		}
 		else
 		{
@@ -510,6 +500,7 @@ public:
 		}
 	}
 };
+
 Sentence convert_to_lexemes(std::string input, id_errors& error, Archieve* archieve)
 {
 	Sentence answer;
@@ -519,94 +510,97 @@ Sentence convert_to_lexemes(std::string input, id_errors& error, Archieve* archi
 	while (pos < input.length())
 	{
 		while (pos < input.length() and input[pos] == ' ')pos++;
-		if (input[pos] == ',')
+		if (pos < input.length())
 		{
-			answer.add_lexeme(Lexeme(COMMA));
-			pos++;
-		}
-		else if (input[pos] == '(')
-		{
-			left_brs++;
-			answer.add_lexeme(Lexeme(LEFT_BR));
-			pos++;
-		}
-		else if (input[pos] == ')')
-		{
-			right_brs++;
-			if (left_brs >= right_brs)
+			if (input[pos] == ',')
 			{
-				answer.add_lexeme(Lexeme(RIGHT_BR));
+				answer.add_lexeme(Lexeme(COMMA));
 				pos++;
 			}
-			else
+			else if (input[pos] == '(')
 			{
-				error = MORE_RIGHT_BRACKETS;
-				return answer;
+				left_brs++;
+				answer.add_lexeme(Lexeme(LEFT_BR));
+				pos++;
 			}
-
-		}
-		else if (is_numeral(input[pos]) == 1)
-		{
-			std::string buffer;
-			bool use_point = 0;
-			while (pos < input.length() and (input[pos] == '.' or is_numeral(input[pos])))
+			else if (input[pos] == ')')
 			{
-				if (input[pos] == '.')
+				right_brs++;
+				if (left_brs >= right_brs)
 				{
-					if (use_point == 0)
+					answer.add_lexeme(Lexeme(RIGHT_BR));
+					pos++;
+				}
+				else
+				{
+					error = MORE_RIGHT_BRACKETS;
+					return answer;
+				}
+
+			}
+			else if (is_numeral(input[pos]) == 1)
+			{
+				std::string buffer;
+				bool use_point = 0;
+				while (pos < input.length() and (input[pos] == '.' or is_numeral(input[pos])))
+				{
+					if (input[pos] == '.')
 					{
-						use_point++;
-						buffer.push_back(input[pos++]);
+						if (use_point == 0)
+						{
+							use_point++;
+							buffer.push_back(input[pos++]);
+						}
+						else
+						{
+							error = ERROR_SIGNS;
+							return answer;
+						}
 					}
 					else
 					{
-						error = ERROR_SIGNS;
+						buffer.push_back(input[pos++]);
+					}
+				}
+				answer.add_lexeme(Lexeme(ARGUMENT, stof(buffer)));
+			}
+			else
+			{
+				std::string buffer;
+				std::vector <int> a = { -1 };
+				int max_id = -1;
+				int pos_max = pos;
+				while (a.empty() == 0 and pos < input.length())
+				{
+					buffer.push_back(input[pos++]);
+					a = archieve->decode(buffer);
+					for (int i = 0; i < a.size(); i++)
+					{
+						if (a[i] > 0)
+						{
+							max_id = a[i];
+							pos_max = pos;
+							break;
+						}
+					}
+				}
+				if (max_id == -1)
+				{
+					if (buffer == "x")
+					{
+						answer.add_lexeme(Lexeme(X));
+					}
+					else
+					{
+						error = UNKNOWN_FUNCTION;
 						return answer;
 					}
 				}
 				else
 				{
-					buffer.push_back(input[pos++]);
+					pos = pos_max;
+					answer.add_lexeme(Lexeme((id_lexemes)max_id));
 				}
-			}
-			answer.add_lexeme(Lexeme(ARGUMENT, stof(buffer)));
-		}
-		else
-		{
-			std::string buffer;
-			std::vector <int> a = { -1 };
-			int max_id = -1;
-			int pos_max = pos;
-			while (a.empty() == 0 and pos < input.length())
-			{
-				buffer.push_back(input[pos++]);
-				a = archieve->decode(buffer);
-				for (int i = 0; i < a.size(); i++)
-				{
-					if (a[i] > 0)
-					{
-						max_id = a[i];
-						pos_max = pos;
-						break;
-					}
-				}
-			}
-			if (max_id == -1)
-			{
-				if (buffer == "x")
-				{
-					answer.add_lexeme(Lexeme(X));
-				}
-				else
-				{
-					error = UNKNOWN_FUNCTION;
-					return answer;
-				}
-			}
-			else
-			{
-				pos = pos_max;
-				answer.add_lexeme(Lexeme((id_lexemes)max_id));
 			}
 		}
 	}
@@ -636,39 +630,39 @@ int main()
 		int prior_mult_div = 3;
 		int prior_plus_minus = 2;
 		cur_op = Operator(ABS, 0, 1, prior_func, 1, "abs");
-		archieve.add_operator(cur_op, my_abs, always_true);
+		archieve.add_operator(cur_op, new Abs);
 		cur_op = Operator(SIN, 0, 1, prior_func, 1, "sin");
-		archieve.add_operator(cur_op, my_sin, always_true);
+		archieve.add_operator(cur_op, new Sin);
 		cur_op = Operator(COS, 0, 1, prior_func, 1, "cos");
-		archieve.add_operator(cur_op, my_cos, always_true);
+		archieve.add_operator(cur_op, new Cos);
 		cur_op = Operator(TG, 0, 1, prior_func, 2, "tg", "tan");
-		archieve.add_operator(cur_op, my_tg, check_tg);
+		archieve.add_operator(cur_op, new Tg);
 		cur_op = Operator(CTG, 0, 1, prior_func, 3, "ctg", "cot", "cotan");
-		archieve.add_operator(cur_op, my_ctg, check_ctg);
+		archieve.add_operator(cur_op, new Ctg);
 		cur_op = Operator(ARCSIN, 0, 1, prior_func, 1, "arcsin");
-		archieve.add_operator(cur_op, my_arcsin, check_arcsin);
+		archieve.add_operator(cur_op, new Arcsin);
 		cur_op = Operator(ARCCOS, 0, 1, prior_func, 1, "arccos");
-		archieve.add_operator(cur_op, my_arccos, check_arcsin);
+		archieve.add_operator(cur_op, new Arccos);
 		cur_op = Operator(ARCTG, 0, 1, prior_func, 2, "arctg", "arctan");
-		archieve.add_operator(cur_op, my_arctg, always_true);
+		archieve.add_operator(cur_op, new Arctg);
 		cur_op = Operator(ARCCTG, 0, 1, prior_func, 3, "arcctg", "arccot", "arccotan");
-		archieve.add_operator(cur_op, my_arcctg, always_true);
+		archieve.add_operator(cur_op, new Arcctg);
 		cur_op = Operator(EXP, 0, 1, prior_func, 1, "exp");
-		archieve.add_operator(cur_op, my_exp, always_true);
+		archieve.add_operator(cur_op, new Exp);
 		cur_op = Operator(LOG, 0, 2, prior_func, 1, "log");
-		archieve.add_operator(cur_op, my_log, check_logarifm);
+		archieve.add_operator(cur_op, new Log);
 		cur_op = Operator(LN, 0, 1, prior_func, 1, "ln");
-		archieve.add_operator(cur_op, my_ln, check_ln);
+		archieve.add_operator(cur_op, new Ln);
 		cur_op = Operator(POW, 1, 1, prior_pow, 1, "^");
-		archieve.add_operator(cur_op, my_pow, check_pow);
+		archieve.add_operator(cur_op, new Pow);
 		cur_op = Operator(MULT, 1, 1, prior_mult_div, 1, "*");
-		archieve.add_operator(cur_op, my_mult, always_true);
+		archieve.add_operator(cur_op, new Mult);
 		cur_op = Operator(DIV, 1, 1, prior_mult_div, 1, "/");
-		archieve.add_operator(cur_op, my_div, check_div);
+		archieve.add_operator(cur_op, new Div);
 		cur_op = Operator(PLUS, 1, 1, prior_plus_minus, 1, "+");
-		archieve.add_operator(cur_op, my_plus, always_true);
+		archieve.add_operator(cur_op, new Plus);
 		cur_op = Operator(MINUS, 1, 1, prior_plus_minus, 1, "-");
-		archieve.add_operator(cur_op, my_minus, always_true);
+		archieve.add_operator(cur_op, new Minus);
 	}
 	std::string input;
 	id_errors error = NON_ERROR;
